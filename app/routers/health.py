@@ -1,7 +1,9 @@
 """Health check router."""
+
 from __future__ import annotations
 
 from fastapi import APIRouter
+
 from ..schemas import StatusResponse
 
 router = APIRouter(tags=["health"])
@@ -16,4 +18,3 @@ def health() -> StatusResponse:
 @router.get("/", include_in_schema=False)
 def root() -> dict:
     return {"service": "remoboard-cloud-api-admin", "status": "running"}
-

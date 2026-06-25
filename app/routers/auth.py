@@ -1,17 +1,24 @@
 """Admin authentication router."""
+
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from ..auth import AdminAuthService, InvalidCredentialsError, InvalidTokenError, TokenRevokedError
+from ..auth import (
+    AdminAuthService,
+    DatabaseUnavailableError,
+    InvalidCredentialsError,
+    InvalidTokenError,
+    TokenRevokedError,
+)
 from ..dependencies import get_auth_service, get_current_admin
 from ..schemas import (
+    AdminInfo,
     LoginRequest,
     LoginResponse,
-    AdminInfo,
     MeResponse,
     RefreshRequest,
     RefreshResponse,
@@ -48,7 +55,7 @@ def login(
 
 
 @router.get("/me", response_model=MeResponse)
-def me(claims: Dict[str, Any] = Depends(get_current_admin)) -> MeResponse:
+def me(claims: dict[str, Any] = Depends(get_current_admin)) -> MeResponse:
     """Return information about the currently authenticated admin."""
     return MeResponse(
         admin=AdminInfo(
@@ -72,6 +79,11 @@ def refresh(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=str(exc),
         ) from exc
+    except DatabaseUnavailableError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Service temporarily unavailable",
+        ) from exc
 
     return RefreshResponse(
         access_token=pair.access_token,
@@ -83,11 +95,16 @@ def refresh(
 
 @router.post("/logout", response_model=StatusResponse)
 def logout(
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(_bearer),
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
     auth_service: AdminAuthService = Depends(get_auth_service),
 ) -> StatusResponse:
     """Revoke the current session (both access and refresh tokens are invalidated)."""
     if credentials:
-        auth_service.revoke_token(credentials.credentials)
+        try:
+            auth_service.revoke_token(credentials.credentials)
+        except DatabaseUnavailableError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Service temporarily unavailable",
+            ) from exc
     return StatusResponse(status="logged_out")
-

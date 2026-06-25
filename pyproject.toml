@@ -51,6 +51,7 @@ ignore = [
     "S101",  # assert allowed in tests
     "S105",  # possible hardcoded password — tested values are intentional
     "S106",
+    "B008",  # Depends() in default args is standard FastAPI pattern
 ]
 
 [tool.ruff.lint.per-file-ignores]

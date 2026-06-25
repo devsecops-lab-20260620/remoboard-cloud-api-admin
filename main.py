@@ -1,4 +1,5 @@
 """Uvicorn entry point for remoboard-cloud-api-admin."""
+
 from __future__ import annotations
 
 import uvicorn

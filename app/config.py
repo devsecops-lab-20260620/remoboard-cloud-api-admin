@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Optional
-
 from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -43,17 +41,14 @@ class AppConfig(BaseSettings):
     db_user: str = "remoboard_admin"
     db_password: str = "please-change-me"
     # Optional full-URL override: set DATABASE_URL to skip individual vars
-    database_url_override: Optional[str] = Field(None, alias="DATABASE_URL")
+    database_url_override: str | None = Field(None, alias="DATABASE_URL")
 
     # ── Computed ─────────────────────────────────────────────────────────
     @model_validator(mode="after")
-    def _set_database_url(self) -> "AppConfig":
+    def _set_database_url(self) -> AppConfig:
         # store computed URL as a plain attribute for easy access
         if not self.database_url_override:
-            url = (
-                f"postgresql://{self.db_user}:{self.db_password}"
-                f"@{self.db_host}:{self.db_port}/{self.db_name}"
-            )
+            url = f"postgresql://{self.db_user}:{self.db_password}@{self.db_host}:{self.db_port}/{self.db_name}"
             object.__setattr__(self, "_database_url", url)
         else:
             object.__setattr__(self, "_database_url", self.database_url_override)
@@ -102,6 +97,6 @@ class AppConfig(BaseSettings):
 
     # ── Factory ──────────────────────────────────────────────────────────
     @classmethod
-    def from_env(cls) -> "AppConfig":
+    def from_env(cls) -> AppConfig:
         """Load config from environment / .env file."""
         return cls()

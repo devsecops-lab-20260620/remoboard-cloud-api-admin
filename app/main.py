@@ -1,8 +1,9 @@
 """FastAPI application factory."""
+
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import AsyncIterator, Optional
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -13,7 +14,7 @@ from .routers import auth as auth_router
 from .routers import health as health_router
 
 
-def create_fastapi_app(config: Optional[AppConfig] = None) -> FastAPI:
+def create_fastapi_app(config: AppConfig | None = None) -> FastAPI:
     """Create and configure the FastAPI application.
 
     Args:
@@ -57,4 +58,3 @@ def create_fastapi_app(config: Optional[AppConfig] = None) -> FastAPI:
 
 # Module-level app instance (used by uvicorn)
 app = create_fastapi_app()
-

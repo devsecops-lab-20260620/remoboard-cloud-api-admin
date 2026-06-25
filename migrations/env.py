@@ -1,4 +1,5 @@
 """Alembic environment configuration."""
+
 from __future__ import annotations
 
 import os
@@ -11,9 +12,9 @@ from sqlalchemy import engine_from_config, pool
 # Make sure the project root is on sys.path
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
+import app.models  # noqa: E402, F401 — ensure models are registered on Base.metadata
 from app.config import AppConfig  # noqa: E402
 from app.database import Base  # noqa: E402
-import app.models  # noqa: E402, F401 — ensure models are registered on Base.metadata
 
 config = context.config
 target_metadata = Base.metadata
@@ -62,4 +63,3 @@ if context.is_offline_mode():
     run_migrations_offline()
 else:
     run_migrations_online()
-

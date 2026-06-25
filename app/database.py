@@ -1,7 +1,8 @@
 """SQLAlchemy engine / session management."""
+
 from __future__ import annotations
 
-from typing import Generator
+from collections.abc import Generator
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
@@ -30,7 +31,11 @@ def init_db(database_url: str) -> None:
     the test database.
     """
     global _engine, _SessionLocal
-    _engine = create_engine(database_url, pool_pre_ping=True)
+    _engine = create_engine(
+        database_url,
+        pool_pre_ping=True,
+        connect_args={"connect_timeout": 5},
+    )
     _SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=_engine)
 
 
@@ -48,4 +53,3 @@ def get_db() -> Generator[Session, None, None]:
         yield db
     finally:
         db.close()
-

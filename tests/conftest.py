@@ -1,8 +1,9 @@
 """Shared pytest fixtures for all test layers."""
+
 from __future__ import annotations
 
 import os
-from typing import Generator
+from collections.abc import Generator
 
 import pytest
 from fastapi.testclient import TestClient
@@ -17,6 +18,7 @@ from app.main import create_fastapi_app
 # ---------------------------------------------------------------------------
 # Test configuration fixture (no .env / DB required)
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture(scope="session")
 def test_config() -> AppConfig:
@@ -73,6 +75,7 @@ def db_session(db_engine) -> Generator[Session, None, None]:
 # FastAPI test client fixtures
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture
 def client_no_db(test_config: AppConfig) -> Generator[TestClient, None, None]:
     """TestClient with DB dependency replaced by None (unit-style tests)."""
@@ -98,4 +101,3 @@ def client(test_config: AppConfig, db_session: Session) -> Generator[TestClient,
     app.dependency_overrides[get_db] = override_get_db
     with TestClient(app, raise_server_exceptions=True) as c:
         yield c
-

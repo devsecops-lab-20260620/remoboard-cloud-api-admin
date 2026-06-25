@@ -1,42 +1,42 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 import json
-from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
+from collections.abc import Callable, Iterable
+from dataclasses import dataclass
+from typing import Any
 
 from .auth import AdminAuthService, AuthenticationError, InvalidCredentialsError, InvalidTokenError, TokenRevokedError
 from .config import AppConfig
 
-
-JsonDict = Dict[str, Any]
-StartResponse = Callable[[str, List[Tuple[str, str]]], None]
+JsonDict = dict[str, Any]
+StartResponse = Callable[[str, list[tuple[str, str]]], None]
 
 
 @dataclass
 class HttpError(Exception):
     status: str
     message: str
-    details: Optional[Any] = None
+    details: Any | None = None
 
 
 @dataclass
 class HttpResponse:
     status: str
     body: bytes
-    headers: List[Tuple[str, str]]
+    headers: list[tuple[str, str]]
 
 
 class AdminApiApp:
-    def __init__(self, config: Optional[AppConfig] = None, auth_service: Optional[AdminAuthService] = None):
+    def __init__(self, config: AppConfig | None = None, auth_service: AdminAuthService | None = None):
         self.config = config or AppConfig.from_env()
         self.auth_service = auth_service or AdminAuthService(self.config)
 
-    def __call__(self, environ: Dict[str, Any], start_response: StartResponse) -> Iterable[bytes]:
+    def __call__(self, environ: dict[str, Any], start_response: StartResponse) -> Iterable[bytes]:
         response = self.handle_request(environ)
         start_response(response.status, response.headers)
         return [response.body]
 
-    def handle_request(self, environ: Dict[str, Any]) -> HttpResponse:
+    def handle_request(self, environ: dict[str, Any]) -> HttpResponse:
         method = (environ.get("REQUEST_METHOD") or "GET").upper()
         path = self._normalize_path(environ.get("PATH_INFO") or "/")
 
@@ -67,9 +67,11 @@ class AdminApiApp:
         except ValueError as exc:
             return self._error_response(HttpError(status="400 Bad Request", message=str(exc)))
         except Exception as exc:  # pragma: no cover - defensive fallback
-            return self._error_response(HttpError(status="500 Internal Server Error", message="Internal Server Error", details=str(exc)))
+            return self._error_response(
+                HttpError(status="500 Internal Server Error", message="Internal Server Error", details=str(exc))
+            )
 
-    def _login(self, environ: Dict[str, Any]) -> HttpResponse:
+    def _login(self, environ: dict[str, Any]) -> HttpResponse:
         payload = self._read_json_body(environ)
         username = payload.get("username")
         password = payload.get("password")
@@ -89,7 +91,7 @@ class AdminApiApp:
             status="200 OK",
         )
 
-    def _me(self, environ: Dict[str, Any]) -> HttpResponse:
+    def _me(self, environ: dict[str, Any]) -> HttpResponse:
         claims = self._require_bearer_token(environ)
         return self._json_response(
             {
@@ -101,7 +103,7 @@ class AdminApiApp:
             }
         )
 
-    def _refresh(self, environ: Dict[str, Any]) -> HttpResponse:
+    def _refresh(self, environ: dict[str, Any]) -> HttpResponse:
         payload = self._read_json_body(environ)
         refresh_token = payload.get("refresh_token")
         if not refresh_token:
@@ -117,25 +119,25 @@ class AdminApiApp:
             }
         )
 
-    def _logout(self, environ: Dict[str, Any]) -> HttpResponse:
+    def _logout(self, environ: dict[str, Any]) -> HttpResponse:
         token = self._extract_bearer_token(environ)
         if token:
             self.auth_service.revoke_token(token)
         return self._json_response({"status": "logged_out"})
 
-    def _require_bearer_token(self, environ: Dict[str, Any]) -> JsonDict:
+    def _require_bearer_token(self, environ: dict[str, Any]) -> JsonDict:
         token = self._extract_bearer_token(environ)
         if not token:
             raise HttpError(status="401 Unauthorized", message="Missing bearer token")
         return self.auth_service.verify_access_token(token)
 
-    def _extract_bearer_token(self, environ: Dict[str, Any]) -> Optional[str]:
+    def _extract_bearer_token(self, environ: dict[str, Any]) -> str | None:
         header = environ.get("HTTP_AUTHORIZATION") or ""
         if not header.lower().startswith("bearer "):
             return None
         return header[7:].strip() or None
 
-    def _read_json_body(self, environ: Dict[str, Any]) -> JsonDict:
+    def _read_json_body(self, environ: dict[str, Any]) -> JsonDict:
         content_length = int(environ.get("CONTENT_LENGTH") or 0)
         body = environ.get("wsgi.input").read(content_length) if content_length else b""
         if not body:
@@ -152,7 +154,12 @@ class AdminApiApp:
             raise HttpError(status="400 Bad Request", message="JSON body must be an object")
         return data
 
-    def _json_response(self, payload: JsonDict, status: str = "200 OK", extra_headers: Optional[List[Tuple[str, str]]] = None) -> HttpResponse:
+    def _json_response(
+        self,
+        payload: JsonDict,
+        status: str = "200 OK",
+        extra_headers: list[tuple[str, str]] | None = None,
+    ) -> HttpResponse:
         body = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
         headers = [
             ("Content-Type", "application/json; charset=utf-8"),
@@ -190,7 +197,5 @@ class AdminApiApp:
         return path if path.startswith("/") else f"/{path}"
 
 
-def create_app(config: Optional[AppConfig] = None) -> AdminApiApp:
+def create_app(config: AppConfig | None = None) -> AdminApiApp:
     return AdminApiApp(config=config)
-
-
