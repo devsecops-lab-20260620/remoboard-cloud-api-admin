@@ -44,6 +44,13 @@
 }
 ```
 
+#### curl 例
+```bash
+curl -X POST http://127.0.0.1:8000/api/admin/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"admin","password":"<password>"}'
+```
+
 #### 成功レスポンス例
 ```json
 {
@@ -74,6 +81,12 @@
 #### ヘッダー例
 ```http
 Authorization: Bearer <access_token>
+```
+
+#### curl例
+```bash
+curl -X GET http://127.0.0.1:8000/api/admin/auth/me \
+  -H 'Authorization: Bearer <access_token>'
 ```
 
 #### 成功レスポンス例

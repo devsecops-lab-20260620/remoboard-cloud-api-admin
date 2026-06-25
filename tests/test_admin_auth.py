@@ -3,7 +3,7 @@ from __future__ import annotations
 import io
 import json
 import unittest
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from app.config import AppConfig
 from app.server import create_app
@@ -28,13 +28,13 @@ class AdminAuthApiTests(unittest.TestCase):
         self,
         method: str,
         path: str,
-        body: Optional[Dict[str, Any]] = None,
-        headers: Optional[Dict[str, str]] = None,
-    ) -> Tuple[str, List[Tuple[str, str]], Dict[str, Any]]:
+        body: dict[str, Any] | None = None,
+        headers: dict[str, str] | None = None,
+    ) -> tuple[str, list[tuple[str, str]], dict[str, Any]]:
         payload = b""
         if body is not None:
             payload = json.dumps(body).encode("utf-8")
-        environ: Dict[str, Any] = {
+        environ: dict[str, Any] = {
             "REQUEST_METHOD": method,
             "PATH_INFO": path,
             "wsgi.input": io.BytesIO(payload),
@@ -43,9 +43,9 @@ class AdminAuthApiTests(unittest.TestCase):
         }
         for key, value in (headers or {}).items():
             environ[f"HTTP_{key.upper().replace('-', '_')}"] = value
-        captured: Dict[str, Any] = {}
+        captured: dict[str, Any] = {}
 
-        def start_response(status: str, response_headers: List[Tuple[str, str]]) -> None:
+        def start_response(status: str, response_headers: list[tuple[str, str]]) -> None:
             captured["status"] = status
             captured["headers"] = response_headers
 
@@ -58,13 +58,21 @@ class AdminAuthApiTests(unittest.TestCase):
         self.assertEqual(payload, {"status": "ok"})
 
     def test_login_and_me(self) -> None:
-        status, _, payload = self._request("POST", "/api/admin/auth/login", {"username": "admin-user", "password": "admin-pass"})
+        status, _, payload = self._request(
+            "POST",
+            "/api/admin/auth/login",
+            {"username": "admin-user", "password": "admin-pass"},
+        )
         self.assertEqual(status, "200 OK")
         self.assertEqual(payload["token_type"], "bearer")
         self.assertIn("access_token", payload)
         self.assertIn("refresh_token", payload)
 
-        status, _, me_payload = self._request("GET", "/admin/auth/me", headers={"Authorization": f"Bearer {payload['access_token']}"})
+        status, _, me_payload = self._request(
+            "GET",
+            "/admin/auth/me",
+            headers={"Authorization": f"Bearer {payload['access_token']}"},
+        )
         self.assertEqual(status, "200 OK")
         self.assertEqual(me_payload["admin"]["username"], "admin-user")
         self.assertEqual(me_payload["admin"]["display_name"], "Admin User")
@@ -75,7 +83,11 @@ class AdminAuthApiTests(unittest.TestCase):
         self.assertIn("error", payload)
 
     def test_refresh_rotates_tokens(self) -> None:
-        _, _, login_payload = self._request("POST", "/admin/auth/login", {"username": "admin-user", "password": "admin-pass"})
+        _, _, login_payload = self._request(
+            "POST",
+            "/admin/auth/login",
+            {"username": "admin-user", "password": "admin-pass"},
+        )
         old_refresh = login_payload["refresh_token"]
         status, _, refresh_payload = self._request("POST", "/admin/auth/refresh", {"refresh_token": old_refresh})
         self.assertEqual(status, "200 OK")
@@ -87,7 +99,11 @@ class AdminAuthApiTests(unittest.TestCase):
         self.assertIn("error", old_refresh_payload)
 
     def test_logout_revokes_access_token(self) -> None:
-        _, _, login_payload = self._request("POST", "/admin/auth/login", {"username": "admin-user", "password": "admin-pass"})
+        _, _, login_payload = self._request(
+            "POST",
+            "/admin/auth/login",
+            {"username": "admin-user", "password": "admin-pass"},
+        )
         token = login_payload["access_token"]
         refresh_token = login_payload["refresh_token"]
         status, _, payload = self._request("POST", "/admin/auth/logout", headers={"Authorization": f"Bearer {token}"})

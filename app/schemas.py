@@ -1,8 +1,8 @@
 """Pydantic request / response schemas."""
+
 from __future__ import annotations
 
 from pydantic import BaseModel, Field
-
 
 # ---------------------------------------------------------------------------
 # Shared
@@ -22,7 +22,7 @@ class AdminInfo(BaseModel):
 
 class LoginRequest(BaseModel):
     username: str = Field(..., min_length=1)
-    password: str = Field(..., min_length=1)
+    password: str = Field(..., min_length=1, max_length=128)
 
 
 class LoginResponse(BaseModel):
@@ -67,4 +67,3 @@ class MeResponse(BaseModel):
 
 class StatusResponse(BaseModel):
     status: str
-

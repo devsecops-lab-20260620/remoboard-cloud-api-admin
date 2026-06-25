@@ -4,6 +4,7 @@ Revision ID: 0001
 Revises: (initial)
 Create Date: 2026-06-25
 """
+
 from __future__ import annotations
 
 import sqlalchemy as sa
@@ -62,13 +63,8 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_index(
-        op.f("ix_admin_revoked_sessions_sid"), table_name="admin_revoked_sessions"
-    )
+    op.drop_index(op.f("ix_admin_revoked_sessions_sid"), table_name="admin_revoked_sessions")
     op.drop_table("admin_revoked_sessions")
 
-    op.drop_index(
-        op.f("ix_admin_revoked_tokens_jti"), table_name="admin_revoked_tokens"
-    )
+    op.drop_index(op.f("ix_admin_revoked_tokens_jti"), table_name="admin_revoked_tokens")
     op.drop_table("admin_revoked_tokens")
-

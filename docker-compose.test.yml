@@ -9,13 +9,13 @@ services:
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: remoboard_admin
+      POSTGRES_USER: remoboard_test
       POSTGRES_PASSWORD: test-password
       POSTGRES_DB: remoboard_test
     ports:
-      - "5433:5432"   # 5433 on host to avoid conflicts with a local Postgres
+      - "5433:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U remoboard_admin"]
+      test: ["CMD-SHELL", "pg_isready -U remoboard_test"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -23,10 +23,10 @@ services:
   api-test:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.test
     environment:
-      TEST_DATABASE_URL: postgresql://remoboard_admin:test-password@postgres:5432/remoboard_test
-      DATABASE_URL: postgresql://remoboard_admin:test-password@postgres:5432/remoboard_test
+      TEST_DATABASE_URL: postgresql://remoboard_test:test-password@postgres:5432/remoboard_test
+      DATABASE_URL: postgresql://remoboard_test:test-password@postgres:5432/remoboard_test
       ADMIN_AUTH_USERNAME: test-admin
       ADMIN_AUTH_PASSWORD: test-pass
       ADMIN_AUTH_JWT_SECRET: local-test-secret
@@ -37,6 +37,3 @@ services:
     command: >
       sh -c "alembic upgrade head &&
              python -m pytest tests/ -v --cov=app --cov-report=term-missing"
-    volumes:
-      - .:/app
-

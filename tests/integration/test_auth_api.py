@@ -6,11 +6,10 @@ Set TEST_DATABASE_URL or use the docker-compose.test.yml stack.
 Run only these tests:
     pytest tests/integration/ -v
 """
+
 from __future__ import annotations
 
-import pytest
 from fastapi.testclient import TestClient
-
 
 # ---------------------------------------------------------------------------
 # Login
@@ -72,9 +71,7 @@ class TestMe:
         assert resp.status_code == 401
 
     def test_invalid_token_returns_401(self, client: TestClient) -> None:
-        resp = client.get(
-            "/api/admin/auth/me", headers={"Authorization": "Bearer not.a.valid.jwt"}
-        )
+        resp = client.get("/api/admin/auth/me", headers={"Authorization": "Bearer not.a.valid.jwt"})
         assert resp.status_code == 401
 
 
@@ -184,4 +181,3 @@ def _login_pair(client: TestClient) -> dict:
     )
     resp.raise_for_status()
     return resp.json()
-

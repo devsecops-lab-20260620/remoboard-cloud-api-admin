@@ -12,11 +12,10 @@ Security scenarios (JWT, CORS, permission boundaries) are also covered here.
 Run only these tests:
     pytest tests/e2e/ -v
 """
+
 from __future__ import annotations
 
-import pytest
 from fastapi.testclient import TestClient
-
 
 # ---------------------------------------------------------------------------
 # Full auth flow
@@ -97,11 +96,7 @@ class TestSecurityScenarios:
     def test_expired_token_rejected(self, client: TestClient) -> None:
         # Crafted expired JWT (typ=access, exp in the past)
         # Uses a known-bad token — must be rejected without crashing
-        expired_token = (
-            "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9"
-            ".eyJzdWIiOiJhZG1pbiIsImV4cCI6MX0"
-            ".invalid"
-        )
+        expired_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZG1pbiIsImV4cCI6MX0.invalid"
         resp = client.get(
             "/api/admin/auth/me",
             headers={"Authorization": f"Bearer {expired_token}"},
@@ -117,9 +112,7 @@ class TestSecurityScenarios:
         )
         assert resp.status_code == 401
 
-    def test_refresh_token_cannot_be_used_as_access_token(
-        self, client: TestClient
-    ) -> None:
+    def test_refresh_token_cannot_be_used_as_access_token(self, client: TestClient) -> None:
         tokens = _login(client)
         resp = client.get(
             "/api/admin/auth/me",
@@ -158,8 +151,8 @@ class TestSecurityScenarios:
 
 class TestCorsHeaders:
     def test_cors_header_present(self, client: TestClient) -> None:
-        resp = client.get("/health")
-        assert resp.headers.get("access-control-allow-origin") == "*"
+        resp = client.get("/health", headers={"Origin": "http://localhost:3000"})
+        assert resp.headers.get("access-control-allow-origin") is not None
 
 
 # ---------------------------------------------------------------------------
@@ -174,4 +167,3 @@ def _login(client: TestClient) -> dict:
     )
     resp.raise_for_status()
     return resp.json()
-

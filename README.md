@@ -1,74 +1,57 @@
 # remoboard-cloud-api-admin
 
-`remoboard-cloud-api-admin` は、管理者向け認証 API を提供する軽量な Python サービスです。標準ライブラリのみで動作するため、追加のランタイム依存はありません。
+管理者向け認証 API を提供する Python サービスです。FastAPI + SQLAlchemy + PostgreSQL で構成されています。
 
 ## 機能
 
-- 管理者ログイン
+- 管理者ログイン（JWT 発行）
 - アクセストークン / リフレッシュトークン発行
 - 現在の管理者情報取得
-- ログアウト（トークン失効）
+- ログアウト（セッション全失効）
 - ヘルスチェック
-
-## ドキュメント
-
-- `docs/API.md`
-- `docs/LINUX_RUN.md`
-- `docs/CONTAINER_RUN.md`
-- `docs/INDEX.md`
 
 ## エンドポイント
 
-### `GET /health`
-稼働状態を返します。
+| メソッド | パス | 説明 |
+|---|---|---|
+| GET | `/health` | 稼働状態 |
+| POST | `/api/admin/auth/login` | ログイン・トークン発行 |
+| GET | `/api/admin/auth/me` | 現在の管理者情報 |
+| POST | `/api/admin/auth/refresh` | トークンローテーション |
+| POST | `/api/admin/auth/logout` | セッション失効 |
 
-### `POST /api/admin/auth/login`
-管理者認証を行い、トークンを発行します。
-
-リクエスト例:
-
-```json
-{
-  "username": "admin",
-  "password": "change-me-now"
-}
-```
-
-### `GET /api/admin/auth/me`
-Bearer アクセストークンを用いて現在の管理者情報を返します。
-
-### `POST /api/admin/auth/refresh`
-リフレッシュトークンを使って新しいトークンを発行します。
-
-```json
-{
-  "refresh_token": "..."
-}
-```
-
-### `POST /api/admin/auth/logout`
-Bearer アクセストークンを使ってセッション全体を失効します。
-
-## 環境変数
-
-`.env.example` を参照してください。
-
-## 起動方法
+## クイックスタート
 
 ```bash
+python3.12 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env  # 編集して接続情報を設定
 python main.py
 ```
-
-デフォルトでは `127.0.0.1:8000` で起動します。
 
 ## テスト
 
 ```bash
-python -m unittest discover -s tests -p "test_*.py"
+# Unit Test（DB 不要）
+pytest tests/unit/ -v
+
+# Integration + E2E（PostgreSQL 必要）
+export TEST_DATABASE_URL=postgresql://remoboard_test:password@localhost:5432/remoboard_test
+pytest tests/integration/ tests/e2e/ -v
+
+# コンテナで全テスト一括（DB 不要）
+docker compose -f docker-compose.test.yml up --build --exit-code-from api-test
 ```
 
-## 実装メモ
+## ドキュメント
 
-- JWT は HMAC-SHA256 で署名しています。
-- トークン失効はメモリ内のブラックリストで管理します。
-- 管理者アカウントは環境変数で設定します。
+[docs/INDEX.md](docs/INDEX.md) を参照してください。
+
+## 技術スタック
+
+- Python 3.12
+- FastAPI / Uvicorn
+- SQLAlchemy / Alembic
+- PostgreSQL
+- JWT (HMAC-SHA256)

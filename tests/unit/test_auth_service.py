@@ -1,14 +1,11 @@
 """Unit tests — AdminAuthService (no DB, no HTTP layer)."""
-from __future__ import annotations
 
-import time
-from datetime import datetime, timezone
+from __future__ import annotations
 
 import pytest
 
 from app.auth import (
     AdminAuthService,
-    AdminProfile,
     InvalidCredentialsError,
     InvalidTokenError,
     TokenRevokedError,
@@ -73,9 +70,7 @@ class TestIssueTokenPair:
         assert pair.refresh_token
         assert pair.access_token != pair.refresh_token
 
-    def test_access_token_expires_in_is_positive(
-        self, svc: AdminAuthService
-    ) -> None:
+    def test_access_token_expires_in_is_positive(self, svc: AdminAuthService) -> None:
         pair = svc.issue_token_pair(svc.admin_profile)
         assert 0 < pair.access_expires_in <= 60
 
@@ -174,4 +169,3 @@ class TestRevocation:
         svc.refresh_tokens(pair.refresh_token)
         with pytest.raises(TokenRevokedError):
             svc.refresh_tokens(pair.refresh_token)
-

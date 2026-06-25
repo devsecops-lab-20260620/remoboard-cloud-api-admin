@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from datetime import datetime, timezone
 import base64
 import hashlib
 import hmac
@@ -9,9 +7,12 @@ import json
 import secrets
 import threading
 import uuid
-from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING, Any
 
 from .config import AppConfig
+from .models import RevokedSession, RevokedToken
 
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session
@@ -33,6 +34,10 @@ class TokenRevokedError(AuthenticationError):
     pass
 
 
+class DatabaseUnavailableError(Exception):
+    pass
+
+
 @dataclass(frozen=True)
 class TokenPair:
     access_token: str
@@ -45,9 +50,9 @@ class TokenPair:
 class AdminProfile:
     username: str
     display_name: str
-    roles: Tuple[str, ...] = ("admin",)
+    roles: tuple[str, ...] = ("admin",)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "username": self.username,
             "display_name": self.display_name,
@@ -63,12 +68,12 @@ class AdminAuthService:
     When *db* is ``None`` (unit tests), an in-memory blacklist is used.
     """
 
-    def __init__(self, config: AppConfig, db: "Optional[Session]" = None):
+    def __init__(self, config: AppConfig, db: Session | None = None):
         self._config = config
         self._db = db
         # ── in-memory fallback (used when db is None) ──────────────────
-        self._revoked_jti: Dict[str, int] = {}
-        self._revoked_sid: Dict[str, int] = {}
+        self._revoked_jti: dict[str, int] = {}
+        self._revoked_sid: dict[str, int] = {}
         self._lock = threading.RLock()
 
     @property
@@ -90,7 +95,7 @@ class AdminAuthService:
             raise InvalidCredentialsError("Invalid administrator credentials")
         return self.admin_profile
 
-    def issue_token_pair(self, profile: AdminProfile, session_id: Optional[str] = None) -> TokenPair:
+    def issue_token_pair(self, profile: AdminProfile, session_id: str | None = None) -> TokenPair:
         session_id = session_id or uuid.uuid4().hex
         now = self._now()
         session_expires_at = now + self._config.refresh_token_ttl_seconds
@@ -127,10 +132,10 @@ class AdminAuthService:
         )
         return self.issue_token_pair(profile, session_id=claims.get("sid"))
 
-    def verify_access_token(self, token: str) -> Dict[str, Any]:
+    def verify_access_token(self, token: str) -> dict[str, Any]:
         return self.verify_token(token, expected_type="access")
 
-    def verify_token(self, token: str, expected_type: Optional[str] = None) -> Dict[str, Any]:
+    def verify_token(self, token: str, expected_type: str | None = None) -> dict[str, Any]:
         claims = self._decode_jwt(token)
         self._validate_claims(claims, expected_type=expected_type)
         jti = claims.get("jti")
@@ -188,40 +193,54 @@ class AdminAuthService:
 
     def _db_revoke_jti(self, jti: str, exp: int) -> None:
         assert self._db is not None
-        existing = self._db.query(RevokedToken).filter(RevokedToken.jti == jti).first()
-        if not existing:
-            self._db.add(RevokedToken(jti=jti, expires_at=datetime.fromtimestamp(exp, tz=timezone.utc)))
-            self._db.commit()
+        try:
+            existing = self._db.query(RevokedToken).filter(RevokedToken.jti == jti).first()
+            if not existing:
+                self._db.add(RevokedToken(jti=jti, expires_at=datetime.fromtimestamp(exp, tz=UTC)))
+                self._db.commit()
+        except Exception:
+            self._db.rollback()
+            raise DatabaseUnavailableError("Database is unavailable") from None
 
     def _db_revoke_session(self, sid: str, exp: int) -> None:
         assert self._db is not None
-        expires_at = datetime.fromtimestamp(exp, tz=timezone.utc)
-        existing = self._db.query(RevokedSession).filter(RevokedSession.sid == sid).first()
-        if existing:
-            if expires_at > existing.expires_at:
-                existing.expires_at = expires_at
+        try:
+            expires_at = datetime.fromtimestamp(exp, tz=UTC)
+            existing = self._db.query(RevokedSession).filter(RevokedSession.sid == sid).first()
+            if existing:
+                if expires_at > existing.expires_at:
+                    existing.expires_at = expires_at
+                    self._db.commit()
+            else:
+                self._db.add(RevokedSession(sid=sid, expires_at=expires_at))
                 self._db.commit()
-        else:
-            self._db.add(RevokedSession(sid=sid, expires_at=expires_at))
-            self._db.commit()
+        except Exception:
+            self._db.rollback()
+            raise DatabaseUnavailableError("Database is unavailable") from None
 
     def _db_is_jti_revoked(self, jti: str) -> bool:
         assert self._db is not None
-        now = datetime.now(timezone.utc)
-        return (
-            self._db.query(RevokedToken)
-            .filter(RevokedToken.jti == jti, RevokedToken.expires_at > now)
-            .first()
-        ) is not None
+        try:
+            now = datetime.now(UTC)
+            return (
+                self._db.query(RevokedToken).filter(RevokedToken.jti == jti, RevokedToken.expires_at > now).first()
+            ) is not None
+        except Exception:
+            self._db.rollback()
+            raise DatabaseUnavailableError("Database is unavailable") from None
 
     def _db_is_session_revoked(self, sid: str) -> bool:
         assert self._db is not None
-        now = datetime.now(timezone.utc)
-        return (
-            self._db.query(RevokedSession)
-            .filter(RevokedSession.sid == sid, RevokedSession.expires_at > now)
-            .first()
-        ) is not None
+        try:
+            now = datetime.now(UTC)
+            return (
+                self._db.query(RevokedSession)
+                .filter(RevokedSession.sid == sid, RevokedSession.expires_at > now)
+                .first()
+            ) is not None
+        except Exception:
+            self._db.rollback()
+            raise DatabaseUnavailableError("Database is unavailable") from None
 
     # ── JWT core ─────────────────────────────────────────────────────────
 
@@ -233,9 +252,9 @@ class AdminAuthService:
         ttl_seconds: int,
         session_id: str,
         session_expires_at: int,
-    ) -> Tuple[str, Dict[str, Any]]:
+    ) -> tuple[str, dict[str, Any]]:
         exp = now + ttl_seconds
-        claims: Dict[str, Any] = {
+        claims: dict[str, Any] = {
             "iss": self._config.issuer,
             "sub": profile.username,
             "typ": token_type,
@@ -250,7 +269,7 @@ class AdminAuthService:
         }
         return self._encode_jwt(claims), claims
 
-    def _decode_jwt(self, token: str) -> Dict[str, Any]:
+    def _decode_jwt(self, token: str) -> dict[str, Any]:
         parts = token.split(".")
         if len(parts) != 3:
             raise InvalidTokenError("Malformed token")
@@ -273,7 +292,7 @@ class AdminAuthService:
             raise InvalidTokenError("Invalid token payload")
         return claims
 
-    def _validate_claims(self, claims: Dict[str, Any], expected_type: Optional[str]) -> None:
+    def _validate_claims(self, claims: dict[str, Any], expected_type: str | None) -> None:
         required = ("iss", "sub", "typ", "iat", "nbf", "exp", "jti", "sid", "session_exp")
         missing = [field for field in required if field not in claims]
         if missing:
@@ -288,14 +307,10 @@ class AdminAuthService:
         if int(claims["exp"]) <= now:
             raise InvalidTokenError("Token has expired")
 
-    def _encode_jwt(self, claims: Dict[str, Any]) -> str:
+    def _encode_jwt(self, claims: dict[str, Any]) -> str:
         header = {"alg": "HS256", "typ": "JWT"}
-        header_b64 = self._urlsafe_b64encode(
-            json.dumps(header, separators=(",", ":"), sort_keys=True).encode("utf-8")
-        )
-        payload_b64 = self._urlsafe_b64encode(
-            json.dumps(claims, separators=(",", ":"), sort_keys=True).encode("utf-8")
-        )
+        header_b64 = self._urlsafe_b64encode(json.dumps(header, separators=(",", ":"), sort_keys=True).encode("utf-8"))
+        payload_b64 = self._urlsafe_b64encode(json.dumps(claims, separators=(",", ":"), sort_keys=True).encode("utf-8"))
         signing_input = f"{header_b64}.{payload_b64}".encode("ascii")
         signature = hmac.new(
             self._config.jwt_secret.encode("utf-8"),
@@ -316,7 +331,7 @@ class AdminAuthService:
             self._revoked_sid.pop(sid, None)
 
     def _now(self) -> int:
-        return int(datetime.now(timezone.utc).timestamp())
+        return int(datetime.now(UTC).timestamp())
 
     def _seconds_until(self, exp: int) -> int:
         return max(0, int(exp) - self._now())
@@ -329,5 +344,3 @@ class AdminAuthService:
     def _urlsafe_b64decode(data: str) -> bytes:
         padding = "=" * (-len(data) % 4)
         return base64.urlsafe_b64decode(data + padding)
-
-

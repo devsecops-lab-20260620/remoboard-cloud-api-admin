@@ -1,4 +1,5 @@
 """Unit tests — Pydantic schemas."""
+
 from __future__ import annotations
 
 import pytest
@@ -34,4 +35,3 @@ class TestRefreshRequest:
     def test_empty_token_raises(self) -> None:
         with pytest.raises(ValidationError):
             RefreshRequest(refresh_token="")
-

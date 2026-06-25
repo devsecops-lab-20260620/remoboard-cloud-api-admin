@@ -6,4 +6,12 @@ __pycache__
 .venv
 venv
 .env
+.coverage
+coverage.xml
+htmlcov/
+.ruff_cache/
+.mypy_cache/
+docs/
+tests/
+.github/
 
