@@ -1,0 +1,10 @@
+services:
+  remoboard-cloud-api-admin:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      ADMIN_API_HOST: 0.0.0.0
+

@@ -1,0 +1,74 @@
+[project]
+name = "remoboard-cloud-api-admin"
+version = "0.1.0"
+description = "Remoboard Cloud Admin API — authentication service"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.34",
+    "sqlalchemy>=2.0",
+    "alembic>=1.14",
+    "psycopg2-binary>=2.9",
+    "pydantic>=2.10",
+    "pydantic-settings>=2.6",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.25",
+    "pytest-cov>=6.0",
+    "httpx>=0.28",
+    "ruff>=0.9",
+    "mypy>=1.14",
+    "bandit[toml]>=1.8",
+    "types-psycopg2>=2.9",
+]
+
+# ---------------------------------------------------------------------------
+# pytest
+# ---------------------------------------------------------------------------
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+addopts = [
+    "--cov=app",
+    "--cov-report=term-missing",
+    "--cov-report=xml",
+    "-v",
+]
+
+# ---------------------------------------------------------------------------
+# ruff
+# ---------------------------------------------------------------------------
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "B", "S", "UP"]
+ignore = [
+    "S101",  # assert allowed in tests
+    "S105",  # possible hardcoded password — tested values are intentional
+    "S106",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S", "B"]  # relax security/opinionated rules in test files
+
+# ---------------------------------------------------------------------------
+# mypy
+# ---------------------------------------------------------------------------
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true
+warn_return_any = false
+warn_unused_ignores = true
+
+# ---------------------------------------------------------------------------
+# bandit
+# ---------------------------------------------------------------------------
+[tool.bandit]
+exclude_dirs = ["tests", ".venv", "migrations"]
+skips = ["B101", "B105", "B106"]  # assert, hardcoded test passwords
+
